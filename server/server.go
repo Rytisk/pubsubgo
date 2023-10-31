@@ -7,28 +7,42 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"github.com/quic-go/quic-go"
 	"io"
 	"math/big"
 	"net"
-	"os"
 )
+
+type loggingWriter struct{}
+
+func (w loggingWriter) Write(b []byte) (int, error) {
+	_, err := fmt.Printf("Received message: '%s'\n", string(b))
+	return len(b), err
+}
 
 func main() {
 	listen()
 }
 
 func listen() {
+	logger := loggingWriter{}
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8090})
 
 	tlsConf := generateTLSConfig()
 	quicConf := &quic.Config{}
 
 	listener, _ := quic.Listen(udpConn, tlsConf, quicConf)
-	conn, _ := listener.Accept(context.Background())
-	stream, _ := conn.AcceptStream(context.Background())
 
-	io.Copy(os.Stdout, stream)
+	for {
+		conn, _ := listener.Accept(context.Background())
+		fmt.Printf("New connection: %s\n", conn.RemoteAddr().String())
+
+		go func(conn quic.Connection) {
+			stream, _ := conn.AcceptStream(context.Background())
+			io.Copy(logger, stream)
+		}(conn)
+	}
 }
 
 func generateTLSConfig() *tls.Config {
