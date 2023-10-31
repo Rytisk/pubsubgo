@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/quic-go/quic-go"
+	"os"
 	"time"
 )
 
@@ -36,13 +38,22 @@ func publish() error {
 		return err
 	}
 
-	_, err = stream.Write([]byte("message"))
-	if err != nil {
-		return err
+	for {
+		message, err := readUserInput()
+		if err != nil {
+			return err
+		}
+
+		_, err = stream.Write(message)
+		if err != nil {
+			return err
+		}
 	}
+}
 
-	fmt.Println("Press enter to exit...")
-	fmt.Scanln()
-
-	return nil
+func readUserInput() ([]byte, error) {
+	fmt.Print("> ")
+	reader := bufio.NewReader(os.Stdin)
+	line, _, err := reader.ReadLine()
+	return line, err
 }
