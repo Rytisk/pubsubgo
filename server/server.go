@@ -12,23 +12,17 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"pubsubgo/server/broker"
 )
 
-type loggingWriter struct{}
-
-func (w loggingWriter) Write(b []byte) (int, error) {
-	_, err := fmt.Printf("Received message: '%s'\n", string(b))
-	return len(b), err
-}
-
 func main() {
-	go listenForPublishers()
-
-	listenForSubscribers()
+	var b = broker.New()
+	go b.ProcessMessages()
+	go listenForPublishers(b)
+	listenForSubscribers(b)
 }
 
-func listenForPublishers() {
-	logger := loggingWriter{}
+func listenForPublishers(broker *broker.Broker) {
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8090})
 
 	tlsConf := generateTLSConfig()
@@ -42,12 +36,12 @@ func listenForPublishers() {
 
 		go func(conn quic.Connection) {
 			stream, _ := conn.AcceptStream(context.Background())
-			io.Copy(logger, stream)
+			io.Copy(broker, stream)
 		}(conn)
 	}
 }
 
-func listenForSubscribers() {
+func listenForSubscribers(broker *broker.Broker) {
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8091})
 
 	tlsConf := generateTLSConfig()
@@ -61,7 +55,7 @@ func listenForSubscribers() {
 
 		go func(conn quic.Connection) {
 			stream, _ := conn.OpenUniStreamSync(context.Background())
-			stream.Write([]byte("hello"))
+			broker.AddSubscriber(&stream)
 		}(conn)
 	}
 }
