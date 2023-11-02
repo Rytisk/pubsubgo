@@ -22,10 +22,12 @@ func (w loggingWriter) Write(b []byte) (int, error) {
 }
 
 func main() {
-	listen()
+	go listenForPublishers()
+
+	listenForSubscribers()
 }
 
-func listen() {
+func listenForPublishers() {
 	logger := loggingWriter{}
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8090})
 
@@ -36,11 +38,30 @@ func listen() {
 
 	for {
 		conn, _ := listener.Accept(context.Background())
-		fmt.Printf("New connection: %s\n", conn.RemoteAddr().String())
+		fmt.Printf("New publisher connection: %s\n", conn.RemoteAddr().String())
 
 		go func(conn quic.Connection) {
 			stream, _ := conn.AcceptStream(context.Background())
 			io.Copy(logger, stream)
+		}(conn)
+	}
+}
+
+func listenForSubscribers() {
+	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8091})
+
+	tlsConf := generateTLSConfig()
+	quicConf := &quic.Config{}
+
+	listener, _ := quic.Listen(udpConn, tlsConf, quicConf)
+
+	for {
+		conn, _ := listener.Accept(context.Background())
+		fmt.Printf("New subscriber connection: %s\n", conn.RemoteAddr().String())
+
+		go func(conn quic.Connection) {
+			stream, _ := conn.OpenUniStreamSync(context.Background())
+			stream.Write([]byte("hello"))
 		}(conn)
 	}
 }
