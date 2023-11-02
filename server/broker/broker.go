@@ -16,6 +16,7 @@ func (s *Subscriber) Read() <-chan []byte {
 
 type Broker struct {
 	subscriberJoined chan *Subscriber
+	subscriberLeft   chan *Subscriber
 	subscribers      []*Subscriber
 	messages         chan []byte
 }
@@ -33,11 +34,7 @@ func (b *Broker) AddSubscriber(subscriber *Subscriber) {
 }
 
 func (b *Broker) RemoveSubscriber(subscriber *Subscriber) {
-	for idx, other := range b.subscribers {
-		if other == subscriber {
-			b.subscribers = append(b.subscribers[:idx], b.subscribers[idx+1:]...)
-		}
-	}
+	b.subscriberLeft <- subscriber
 }
 
 func (b *Broker) Write(message []byte) (int, error) {
@@ -54,6 +51,13 @@ func (b *Broker) ProcessMessages() {
 			}
 		case subscriber := <-b.subscriberJoined:
 			b.subscribers = append(b.subscribers, subscriber)
+		case subscriber := <-b.subscriberLeft:
+			for idx, other := range b.subscribers {
+				if other == subscriber {
+					b.subscribers = append(b.subscribers[:idx], b.subscribers[idx+1:]...)
+				}
+			}
+			close(subscriber.messages)
 		}
 	}
 }

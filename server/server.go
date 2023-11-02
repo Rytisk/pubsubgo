@@ -69,7 +69,6 @@ func listenForSubscribers(brk *broker.Broker) {
 			}
 
 			brk.RemoveSubscriber(subscriber)
-			//TODO: drain subscriber channel?
 		}(conn)
 	}
 }
