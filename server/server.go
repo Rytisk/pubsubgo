@@ -36,12 +36,14 @@ func listenForPublishers(broker *broker.Broker) {
 
 		go func(conn quic.Connection) {
 			stream, _ := conn.AcceptStream(context.Background())
-			io.Copy(broker, stream)
+			if _, err := io.Copy(broker, stream); err != nil {
+				fmt.Printf("error while reading from publisher: %s\n", err)
+			}
 		}(conn)
 	}
 }
 
-func listenForSubscribers(broker *broker.Broker) {
+func listenForSubscribers(brk *broker.Broker) {
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8091})
 
 	tlsConf := generateTLSConfig()
@@ -54,8 +56,20 @@ func listenForSubscribers(broker *broker.Broker) {
 		fmt.Printf("New subscriber connection: %s\n", conn.RemoteAddr().String())
 
 		go func(conn quic.Connection) {
+			subscriber := broker.NewSubscriber()
+			brk.AddSubscriber(subscriber)
+
 			stream, _ := conn.OpenUniStreamSync(context.Background())
-			broker.AddSubscriber(&stream)
+
+			for msg := range subscriber.Read() {
+				if _, err := stream.Write(msg); err != nil {
+					fmt.Printf("error while writing to subscriber: %s\n", err)
+					break
+				}
+			}
+
+			brk.RemoveSubscriber(subscriber)
+			//TODO: drain subscriber channel?
 		}(conn)
 	}
 }
