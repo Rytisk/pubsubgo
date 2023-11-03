@@ -1,40 +1,40 @@
 package broker
 
 type Broker struct {
-	subscribers Subscribers
-	publishers  Publishers
+	subscribers Clients
+	publishers  Clients
 	messages    chan []byte
 }
 
 func New() *Broker {
 	return &Broker{
-		subscribers: Subscribers{
-			joined:  make(chan *Subscriber),
-			left:    make(chan *Subscriber),
-			entries: make([]*Subscriber, 0),
+		subscribers: Clients{
+			joined:  make(chan *Client),
+			left:    make(chan *Client),
+			entries: make([]*Client, 0),
 		},
-		publishers: Publishers{
-			joined:  make(chan *Publisher),
-			left:    make(chan *Publisher),
-			entries: make([]*Publisher, 0),
+		publishers: Clients{
+			joined:  make(chan *Client),
+			left:    make(chan *Client),
+			entries: make([]*Client, 0),
 		},
 		messages: make(chan []byte),
 	}
 }
 
-func (b *Broker) AddSubscriber(subscriber *Subscriber) {
+func (b *Broker) AddSubscriber(subscriber *Client) {
 	b.subscribers.joined <- subscriber
 }
 
-func (b *Broker) RemoveSubscriber(subscriber *Subscriber) {
+func (b *Broker) RemoveSubscriber(subscriber *Client) {
 	b.subscribers.left <- subscriber
 }
 
-func (b *Broker) AddPublisher(publisher *Publisher) {
+func (b *Broker) AddPublisher(publisher *Client) {
 	b.publishers.joined <- publisher
 }
 
-func (b *Broker) RemovePublisher(publisher *Publisher) {
+func (b *Broker) RemovePublisher(publisher *Client) {
 	b.publishers.left <- publisher
 }
 

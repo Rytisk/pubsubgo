@@ -35,7 +35,7 @@ func listenForPublishers(brk *broker.Broker) {
 		fmt.Printf("New publisher connection: %s\n", conn.RemoteAddr().String())
 
 		go func(conn quic.Connection) {
-			publisher := broker.NewPublisher()
+			publisher := broker.NewClient()
 			brk.AddPublisher(publisher)
 
 			stream, _ := conn.AcceptStream(context.Background())
@@ -62,7 +62,7 @@ func listenForSubscribers(brk *broker.Broker) {
 		fmt.Printf("New subscriber connection: %s\n", conn.RemoteAddr().String())
 
 		go func(conn quic.Connection) {
-			subscriber := broker.NewSubscriber()
+			subscriber := broker.NewClient()
 			brk.AddSubscriber(subscriber)
 
 			stream, _ := conn.OpenUniStreamSync(context.Background())
