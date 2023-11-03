@@ -1,5 +1,7 @@
 package broker
 
+import "fmt"
+
 type Broker struct {
 	subscribers Clients
 	publishers  Clients
@@ -47,19 +49,31 @@ func (b *Broker) ProcessMessages() {
 	for {
 		select {
 		case msg := <-b.messages:
-			for _, subscriber := range b.subscribers.entries {
-				subscriber.messages <- msg // TODO: will block if one of the subs disconnected and buffer is full
-			}
+			fmt.Println("@ Message received")
+			b.subscribers.Fanout(msg)
+
 		case publisher := <-b.publishers.joined:
+			fmt.Println("@ Publisher joined")
 			b.publishers.Add(publisher)
+
 		case publisher := <-b.publishers.left:
+			fmt.Println("@ Publisher left")
 			b.publishers.Remove(publisher)
 			close(publisher.messages)
+
 		case subscriber := <-b.subscribers.joined:
+			fmt.Println("@ Subscriber joined")
 			b.subscribers.Add(subscriber)
+			b.publishers.Fanout([]byte("A new subscriber joined!"))
+
 		case subscriber := <-b.subscribers.left:
+			fmt.Println("@ Subscriber left")
 			b.subscribers.Remove(subscriber)
 			close(subscriber.messages)
+
+			if b.subscribers.IsEmpty() {
+				b.publishers.Fanout([]byte("There are no subscribers listening!"))
+			}
 		}
 	}
 }

@@ -40,6 +40,15 @@ func listenForPublishers(brk *broker.Broker) {
 
 			stream, _ := conn.AcceptStream(context.Background())
 
+			go func(publisher *broker.Client, stream *quic.Stream) {
+				for msg := range publisher.Read() {
+					if _, err := (*stream).Write(msg); err != nil {
+						fmt.Printf("error while writing to publisher: %s\n", err)
+						break
+					}
+				}
+			}(publisher, &stream)
+
 			if _, err := io.Copy(brk, stream); err != nil {
 				fmt.Printf("error while reading from publisher: %s\n", err)
 			}
