@@ -22,7 +22,7 @@ func main() {
 	listenForSubscribers(b)
 }
 
-func listenForPublishers(broker *broker.Broker) {
+func listenForPublishers(brk *broker.Broker) {
 	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8090})
 
 	tlsConf := generateTLSConfig()
@@ -35,10 +35,16 @@ func listenForPublishers(broker *broker.Broker) {
 		fmt.Printf("New publisher connection: %s\n", conn.RemoteAddr().String())
 
 		go func(conn quic.Connection) {
+			publisher := broker.NewPublisher()
+			brk.AddPublisher(publisher)
+
 			stream, _ := conn.AcceptStream(context.Background())
-			if _, err := io.Copy(broker, stream); err != nil {
+
+			if _, err := io.Copy(brk, stream); err != nil {
 				fmt.Printf("error while reading from publisher: %s\n", err)
 			}
+
+			brk.RemovePublisher(publisher)
 		}(conn)
 	}
 }
