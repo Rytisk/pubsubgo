@@ -38,6 +38,6 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Read() <-chan []byte {
+func (c *Client) ReadMessages() <-chan []byte {
 	return c.messages
 }

@@ -15,76 +15,65 @@ import (
 	"pubsubgo/server/broker"
 )
 
-func main() {
-	var b = broker.New()
-	go b.ProcessMessages()
-	go listenForPublishers(b)
-	listenForSubscribers(b)
-}
+type ProcessConnection func(conn *quic.Connection, brk *broker.Broker)
 
-func listenForPublishers(brk *broker.Broker) {
-	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8090})
+func processSubscriberConnection(conn *quic.Connection, brk *broker.Broker) {
+	subscriber := broker.NewClient()
+	brk.AddSubscriber(subscriber)
 
-	tlsConf := generateTLSConfig()
-	quicConf := &quic.Config{}
+	stream, _ := (*conn).OpenUniStreamSync(context.Background())
 
-	listener, _ := quic.Listen(udpConn, tlsConf, quicConf)
-
-	for {
-		conn, _ := listener.Accept(context.Background())
-		fmt.Printf("New publisher connection: %s\n", conn.RemoteAddr().String())
-
-		go func(conn quic.Connection) {
-			publisher := broker.NewClient()
-			brk.AddPublisher(publisher)
-
-			stream, _ := conn.AcceptStream(context.Background())
-
-			go func(publisher *broker.Client, stream *quic.Stream) {
-				for msg := range publisher.Read() {
-					if _, err := (*stream).Write(msg); err != nil {
-						fmt.Printf("error while writing to publisher: %s\n", err)
-						break
-					}
-				}
-			}(publisher, &stream)
-
-			if _, err := io.Copy(brk, stream); err != nil {
-				fmt.Printf("error while reading from publisher: %s\n", err)
-			}
-
-			brk.RemovePublisher(publisher)
-		}(conn)
+	for msg := range subscriber.ReadMessages() {
+		if _, err := stream.Write(msg); err != nil {
+			fmt.Printf("error while writing to subscriber: %s\n", err)
+			break
+		}
 	}
+
+	brk.RemoveSubscriber(subscriber)
 }
 
-func listenForSubscribers(brk *broker.Broker) {
-	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: 8091})
+func processPublisherConnection(conn *quic.Connection, brk *broker.Broker) {
+	publisher := broker.NewClient()
+	brk.AddPublisher(publisher)
 
+	stream, _ := (*conn).AcceptStream(context.Background())
+
+	go func(publisher *broker.Client, stream *quic.Stream) {
+		for msg := range publisher.ReadMessages() {
+			if _, err := (*stream).Write(msg); err != nil {
+				fmt.Printf("error while writing to publisher: %s\n", err)
+				break
+			}
+		}
+	}(publisher, &stream)
+
+	if _, err := io.Copy(brk, stream); err != nil {
+		fmt.Printf("error while reading from publisher: %s\n", err)
+	}
+
+	brk.RemovePublisher(publisher)
+}
+
+func main() {
 	tlsConf := generateTLSConfig()
+	brk := broker.New()
+	go brk.ProcessMessages()
+	go listen(brk, processPublisherConnection, 8090, tlsConf)
+	listen(brk, processSubscriberConnection, 8091, tlsConf)
+}
+
+func listen(brk *broker.Broker, process ProcessConnection, port int, tlsConf *tls.Config) {
+	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
 	quicConf := &quic.Config{}
 
 	listener, _ := quic.Listen(udpConn, tlsConf, quicConf)
 
 	for {
 		conn, _ := listener.Accept(context.Background())
-		fmt.Printf("New subscriber connection: %s\n", conn.RemoteAddr().String())
+		fmt.Printf("New connection on port '%d': %s\n", port, conn.RemoteAddr().String())
 
-		go func(conn quic.Connection) {
-			subscriber := broker.NewClient()
-			brk.AddSubscriber(subscriber)
-
-			stream, _ := conn.OpenUniStreamSync(context.Background())
-
-			for msg := range subscriber.Read() {
-				if _, err := stream.Write(msg); err != nil {
-					fmt.Printf("error while writing to subscriber: %s\n", err)
-					break
-				}
-			}
-
-			brk.RemoveSubscriber(subscriber)
-		}(conn)
+		go process(&conn, brk)
 	}
 }
 
