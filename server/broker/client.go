@@ -4,6 +4,13 @@ type Clients struct {
 	entries []*Client
 }
 
+type PubSubClients interface {
+	IsEmpty() bool
+	Add(client *Client)
+	Remove(client *Client)
+	Fanout(message []byte)
+}
+
 func (c *Clients) IsEmpty() bool {
 	return len(c.entries) == 0
 }

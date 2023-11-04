@@ -1,195 +1,185 @@
 package broker
 
 import (
-	"strings"
+	"github.com/stretchr/testify/mock"
 	"testing"
 )
 
+type ClientsMock struct {
+	mock.Mock
+}
+
+func (cm *ClientsMock) Fanout(message []byte) {
+	cm.Called(message)
+}
+
+func (cm *ClientsMock) IsEmpty() bool {
+	args := cm.Called()
+	return args.Bool(0)
+}
+
+func (cm *ClientsMock) Add(client *Client) {
+	cm.Called(client)
+}
+
+func (cm *ClientsMock) Remove(client *Client) {
+	cm.Called(client)
+}
+
 func TestWrite(t *testing.T) {
+	msg := []byte("hi")
+
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("Fanout", msg).Once()
+
 	broker := New()
-	broker.subscribers.entries = []*Client{NewClient(), NewClient()}
+	broker.subscribers = subscribersMock
 
 	stop := make(chan struct{})
-	msg := "hi"
-
 	go func() {
-		broker.Write([]byte(msg))
-	}()
-
-	go func() {
-		for _, subscriber := range broker.subscribers.entries {
-			actualMsg := <-subscriber.messages
-			if string(actualMsg) != msg {
-				t.Errorf("Write() got '%s', want '%s'", actualMsg, msg)
-			}
-		}
+		broker.Write(msg)
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
+
+	subscribersMock.AssertExpectations(t)
 }
 
 func TestAddPublisher(t *testing.T) {
-	broker := New()
 	publisher := NewClient()
 
-	stop := make(chan struct{})
+	publishersMock := &ClientsMock{}
+	publishersMock.On("Add", publisher).Once()
 
+	broker := New()
+	broker.publishers = publishersMock
+
+	stop := make(chan struct{})
 	go func() {
 		broker.AddPublisher(publisher)
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
 
-	if broker.publishers.IsEmpty() {
-		t.Errorf("AddPublisher(publisher) did not add a new entry to broker")
-	}
+	publishersMock.AssertExpectations(t)
 }
 
 func TestRemovePublisher(t *testing.T) {
-	broker := New()
 	publisher := NewClient()
 
-	stop := make(chan struct{})
+	publishersMock := &ClientsMock{}
+	publishersMock.On("Remove", publisher).Once()
 
-	go func() {
-		broker.AddPublisher(publisher)
-		broker.RemovePublisher(publisher)
-		close(stop)
-	}()
-
-	broker.ProcessMessages(stop)
-
-	if !broker.publishers.IsEmpty() {
-		t.Errorf("RemovePublisher(publisher) did not remove an entry from the broker")
-	}
-}
-
-func TestRemovingNotExistingPublisher(t *testing.T) {
 	broker := New()
-	publisher := NewClient()
+	broker.publishers = publishersMock
 
 	stop := make(chan struct{})
-
 	go func() {
 		broker.RemovePublisher(publisher)
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
+
+	publishersMock.AssertExpectations(t)
 }
 
 func TestAddSubscriber(t *testing.T) {
-	broker := New()
 	subscriber := NewClient()
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("Add", subscriber).Once()
+
+	broker := New()
+	broker.subscribers = subscribersMock
 
 	stop := make(chan struct{})
-
 	go func() {
 		broker.AddSubscriber(subscriber)
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
 
-	if broker.subscribers.IsEmpty() {
-		t.Errorf("AddSubscriber(subscriber) did not add a new entry to broker")
-	}
+	subscribersMock.AssertExpectations(t)
 }
 
 func TestAddingSubscriberInformsPublishers(t *testing.T) {
-	broker := New()
-	broker.publishers.entries = []*Client{NewClient(), NewClient()}
+	publishersMock := &ClientsMock{}
+	publishersMock.On("Fanout", []byte(SubscriberJoined)).Once()
 
-	subscriber := NewClient()
+	broker := New()
+	broker.publishers = publishersMock
 
 	stop := make(chan struct{})
-
 	go func() {
-		broker.AddSubscriber(subscriber)
-	}()
-
-	go func() {
-		for _, publisher := range broker.publishers.entries {
-			msg := <-publisher.messages
-			if !strings.Contains(string(msg), "joined") {
-				t.Errorf("got '%s', expected to contain 'joined'", msg)
-			}
-		}
+		broker.AddSubscriber(NewClient())
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
+
+	publishersMock.AssertExpectations(t)
 }
 
 func TestRemoveSubscriber(t *testing.T) {
-	broker := New()
 	subscriber := NewClient()
-	broker.subscribers.entries = []*Client{subscriber}
+
+	clientsMock := &ClientsMock{}
+	clientsMock.On("Remove", subscriber).Once()
+	clientsMock.On("IsEmpty").Return(false)
+
+	broker := New()
+	broker.subscribers = clientsMock
 
 	stop := make(chan struct{})
-
 	go func() {
 		broker.RemoveSubscriber(subscriber)
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
 
-	if !broker.subscribers.IsEmpty() {
-		t.Errorf("RemoveSubscriber(subscriber) did not remove an entry from the broker")
-	}
+	clientsMock.AssertCalled(t, "Remove", subscriber)
 }
 
 func TestRemovingLastSubscriberInformsPublishers(t *testing.T) {
+	publishersMock := &ClientsMock{}
+	publishersMock.On("Fanout", []byte(NoMoreSubscribers)).Once()
+
 	subscriber := NewClient()
+
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("Remove", subscriber).Once()
+	subscribersMock.On("IsEmpty").Return(true)
+
 	broker := New()
-	broker.publishers.entries = []*Client{NewClient(), NewClient()}
-	broker.subscribers.entries = []*Client{subscriber}
+	broker.publishers = publishersMock
+	broker.subscribers = subscribersMock
 
 	stop := make(chan struct{})
-
 	go func() {
 		broker.RemoveSubscriber(subscriber)
-	}()
-
-	go func() {
-		for _, publisher := range broker.publishers.entries {
-			msg := <-publisher.messages
-			if !strings.Contains(string(msg), "no subscribers") {
-				t.Errorf("got '%s', expected to contain 'no subscribers'", msg)
-			}
-		}
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
+
+	publishersMock.AssertExpectations(t)
+	subscribersMock.AssertExpectations(t)
 }
 
-func TestRemovingSubscriberDoesNotInformPublishers(t *testing.T) {
+func TestRemovingOneSubscriberDoesNotInformPublishers(t *testing.T) {
+	publishersMock := &ClientsMock{}
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("Remove", mock.Anything).Once()
+	subscribersMock.On("IsEmpty").Return(false)
+
 	broker := New()
-	publisher := NewClient()
 	subscriber := NewClient()
-	broker.subscribers.entries = []*Client{subscriber, NewClient()}
-	broker.publishers.entries = []*Client{publisher}
+	broker.subscribers = subscribersMock
+	broker.publishers = publishersMock
 
 	stop := make(chan struct{})
-
 	go func() {
 		broker.RemoveSubscriber(subscriber)
-		close(publisher.messages)
-	}()
-
-	go func() {
-		for _, pub := range broker.publishers.entries {
-			msg := <-pub.messages
-			if strings.Contains(string(msg), "no subscribers") {
-				t.Errorf("got '%s', expected no message containing 'no subscribers'", msg)
-			}
-		}
 		close(stop)
 	}()
-
 	broker.ProcessMessages(stop)
+
+	publishersMock.AssertNotCalled(t, "Fanout")
 }

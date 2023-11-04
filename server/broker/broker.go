@@ -2,9 +2,12 @@ package broker
 
 import "fmt"
 
+const SubscriberJoined = "A new subscriber has joined!"
+const NoMoreSubscribers = "There are no subscribers listening!"
+
 type Broker struct {
-	subscribers      Clients
-	publishers       Clients
+	subscribers      PubSubClients
+	publishers       PubSubClients
 	subscriberJoined chan *Client
 	subscriberLeft   chan *Client
 	publisherJoined  chan *Client
@@ -14,10 +17,10 @@ type Broker struct {
 
 func New() *Broker {
 	return &Broker{
-		subscribers: Clients{
+		subscribers: &Clients{
 			entries: make([]*Client, 0),
 		},
-		publishers: Clients{
+		publishers: &Clients{
 			entries: make([]*Client, 0),
 		},
 		subscriberJoined: make(chan *Client),
@@ -72,7 +75,7 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 		case subscriber := <-b.subscriberJoined:
 			fmt.Println("@ Subscriber joined")
 			b.subscribers.Add(subscriber)
-			b.publishers.Fanout([]byte("A new subscriber joined!"))
+			b.publishers.Fanout([]byte(SubscriberJoined))
 
 		case subscriber := <-b.subscriberLeft:
 			fmt.Println("@ Subscriber left")
@@ -80,7 +83,7 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 			close(subscriber.messages)
 
 			if b.subscribers.IsEmpty() {
-				b.publishers.Fanout([]byte("There are no subscribers listening!"))
+				b.publishers.Fanout([]byte(NoMoreSubscribers))
 			}
 		}
 	}
