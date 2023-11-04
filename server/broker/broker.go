@@ -45,9 +45,13 @@ func (b *Broker) Write(message []byte) (int, error) {
 	return len(message), nil
 }
 
-func (b *Broker) ProcessMessages() {
+func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 	for {
 		select {
+		case <-stop:
+			fmt.Println("@ Stopping processing")
+			//TODO: close and drain channels?
+			return
 		case msg := <-b.messages:
 			fmt.Println("@ Message received")
 			b.subscribers.Fanout(msg)

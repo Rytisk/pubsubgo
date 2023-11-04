@@ -58,9 +58,18 @@ func processPublisherConnection(conn *quic.Connection, brk *broker.Broker) {
 func main() {
 	tlsConf := generateTLSConfig()
 	brk := broker.New()
-	go brk.ProcessMessages()
+	stop := make(chan struct{})
+
+	go func(stop chan<- struct{}) {
+		fmt.Println("Press enter to stop...")
+		fmt.Scanln()
+		close(stop)
+	}(stop)
+
 	go listen(brk, processPublisherConnection, 8090, tlsConf)
-	listen(brk, processSubscriberConnection, 8091, tlsConf)
+	go listen(brk, processSubscriberConnection, 8091, tlsConf)
+
+	brk.ProcessMessages(stop)
 }
 
 func listen(brk *broker.Broker, process ProcessConnection, port int, tlsConf *tls.Config) {
