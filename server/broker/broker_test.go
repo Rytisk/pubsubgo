@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+func TestWrite(t *testing.T) {
+	broker := New()
+	broker.subscribers.entries = []*Client{NewClient(), NewClient()}
+
+	stop := make(chan struct{})
+	msg := "hi"
+
+	go func() {
+		broker.Write([]byte(msg))
+	}()
+
+	go func() {
+		for _, subscriber := range broker.subscribers.entries {
+			actualMsg := <-subscriber.messages
+			if string(actualMsg) != msg {
+				t.Errorf("Write() got '%s', want '%s'", actualMsg, msg)
+			}
+		}
+		close(stop)
+	}()
+
+	broker.ProcessMessages(stop)
+}
+
 func TestAddPublisher(t *testing.T) {
 	broker := New()
 	publisher := NewClient()
