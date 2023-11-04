@@ -59,6 +59,7 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 			fmt.Println("@ Stopping processing")
 			//TODO: close and drain channels?
 			return
+
 		case msg := <-b.messages:
 			fmt.Println("@ Message received")
 			b.subscribers.Fanout(msg)
