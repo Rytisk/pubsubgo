@@ -2,8 +2,6 @@ package broker
 
 type Clients struct {
 	entries []*Client
-	joined  chan *Client
-	left    chan *Client
 }
 
 func (c *Clients) IsEmpty() bool {
