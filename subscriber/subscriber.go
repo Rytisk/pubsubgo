@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/quic-go/quic-go"
 	"io"
+	"strings"
 )
 
 type loggingWriter struct{}
@@ -17,7 +18,7 @@ func (w loggingWriter) Write(b []byte) (int, error) {
 
 func main() {
 	err := subscribe()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "bye from subscriber") {
 		panic(err)
 	}
 }
@@ -34,6 +35,13 @@ func subscribe() error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		fmt.Println("Press enter to exit...")
+		fmt.Scanln()
+
+		conn.CloseWithError(0x00, "bye from subscriber")
+	}()
 
 	stream, err := conn.AcceptUniStream(context.Background())
 	if err != nil {
