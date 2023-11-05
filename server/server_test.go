@@ -102,10 +102,13 @@ func runPublisher(t *testing.T, messagesCount int, subscribersCount int) error {
 
 	go func() {
 		// Wait for all subscribers to join before writing the messages
-		for i := 0; i < subscribersCount; i++ {
+		for i := 0; i < subscribersCount; {
 			buf := make([]byte, len(broker.SubscriberJoined))
 			if _, err = stream.Read(buf); err != nil {
 				t.Fatalf("Publisher failed: %s", err)
+			}
+			if string(buf) == broker.SubscriberJoined {
+				i++
 			}
 		}
 
