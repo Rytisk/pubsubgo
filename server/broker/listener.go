@@ -35,7 +35,7 @@ func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 		}
 	}()
 
-	stream, err := conn.OpenUniStreamSync(context.Background())
+	stream, err := conn.OpenUniStreamSync(context.TODO())
 	if err != nil {
 		fmt.Printf("Failed to open a stream to subscriber, reason: %s\n", err)
 		return
@@ -54,7 +54,7 @@ func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 		}
 	}()
 
-	stream, err := conn.AcceptStream(context.Background())
+	stream, err := conn.AcceptStream(context.TODO())
 	if err != nil {
 		fmt.Printf("Failed to accept publisher's stream, reason: %s\n", err)
 		return
@@ -81,7 +81,7 @@ func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *t
 	}
 
 	for {
-		conn, err := listener.Accept(context.Background())
+		conn, err := listener.Accept(context.TODO())
 		if err != nil {
 			fmt.Printf("Failed to accept a new connection, reason: %s\n", err)
 			continue
