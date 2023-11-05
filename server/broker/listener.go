@@ -18,7 +18,7 @@ func forwardMessages(dst io.Writer, srcClient *Client) {
 	for msg := range srcClient.ReadMessages() {
 		if _, err := dst.Write(msg); err != nil {
 			if !errors.Is(err, io.EOF) {
-				fmt.Printf("error while forwarding: %s\n", err)
+				fmt.Printf("Failed to forward a message: %s\n", err)
 			}
 			break
 		}
@@ -64,7 +64,7 @@ func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 
 	if _, err := io.Copy(broker, stream); err != nil {
 		if !errors.Is(err, io.EOF) {
-			fmt.Printf("error while reading from publisher: %s\n", err)
+			fmt.Printf("Failed to read from publisher: %s\n", err)
 		}
 	}
 }
