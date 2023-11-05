@@ -1,14 +1,18 @@
 package broker
 
-type Clients struct {
-	entries []*Client
-}
-
+// PubSubClients holds a collection of Client entries and
+// provides convenient methods to manage it
 type PubSubClients interface {
 	IsEmpty() bool
 	Add(client *Client)
 	Remove(client *Client)
+	// Fanout writes the provided message to all the entries in
+	// the Clients collection
 	Fanout(message []byte)
+}
+
+type Clients struct {
+	entries []*Client
 }
 
 func (c *Clients) IsEmpty() bool {
@@ -33,6 +37,7 @@ func (c *Clients) Fanout(message []byte) {
 	}
 }
 
+// Client is a model depicting a client of the Broker - a Publisher or a Subscriber
 type Client struct {
 	messages chan []byte
 }
@@ -43,10 +48,14 @@ func NewClient() *Client {
 	}
 }
 
+// ReadMessages returns a channel of the messages
+// sent to this client
 func (c *Client) ReadMessages() <-chan []byte {
 	return c.messages
 }
 
+// Write method writes the provided message to the Client's
+// messages channel or drops the message if writing to the channel blocks
 func (c *Client) Write(message []byte) {
 	select {
 	case c.messages <- message:

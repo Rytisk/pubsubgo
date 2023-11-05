@@ -45,6 +45,8 @@ func run(stop <-chan struct{}) {
 	//TODO: graceful shutdown: close channels, close connections, wait for goroutines to finish
 }
 
+// Setup TLS config for the server
+// Copied from: https://github.com/quic-go/quic-go/blob/9414ea49100d5cf75a2044d85a6becf3985171db/example/echo/echo.go#L92
 func generateTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {

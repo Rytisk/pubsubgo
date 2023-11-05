@@ -63,6 +63,8 @@ func (b *Broker) Write(message []byte) (int, error) {
 	return len(message), nil
 }
 
+// ProcessMessages is the main processing loop that should run
+// throughout the lifetime of the application.
 func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 	for {
 		select {

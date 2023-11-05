@@ -17,6 +17,7 @@ func (w loggingWriter) Write(b []byte) (int, error) {
 	return len(b), err
 }
 
+// Simple Subscriber client application for testing purposes
 func main() {
 	err := subscribe()
 	if err != nil && !strings.Contains(err.Error(), "bye from subscriber") {

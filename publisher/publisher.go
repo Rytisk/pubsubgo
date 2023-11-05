@@ -11,19 +11,20 @@ import (
 	"time"
 )
 
+type loggingWriter struct{}
+
+func (w loggingWriter) Write(b []byte) (int, error) {
+	_, err := fmt.Printf("\n< Received message: '%s'\n> ", string(b))
+	return len(b), err
+}
+
+// Simple Publisher client application for testing purposes
 func main() {
 	err := publish()
 
 	if err != nil {
 		panic(err)
 	}
-}
-
-type loggingWriter struct{}
-
-func (w loggingWriter) Write(b []byte) (int, error) {
-	_, err := fmt.Printf("\n< Received message: '%s'\n> ", string(b))
-	return len(b), err
 }
 
 func publish() error {

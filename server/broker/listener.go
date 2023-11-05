@@ -25,6 +25,7 @@ func forwardMessages(dst io.Writer, srcClient *Client) {
 	}
 }
 
+// ProcessSubscriberConn handles the subscriber's connection throughout its lifetime
 func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 	subscriber := NewClient()
 	broker.AddSubscriber(subscriber)
@@ -44,6 +45,7 @@ func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 	forwardMessages(stream, subscriber)
 }
 
+// ProcessPublisherConn handles the publisher's connection throughout its lifetime
 func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 	publisher := NewClient()
 	broker.AddPublisher(publisher)
@@ -69,7 +71,9 @@ func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 	}
 }
 
-func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *tls.Config) error {
+// Listen is listening for QUIC connections on the provided port and
+// processes each connection in a new processConn goroutine
+func Listen(broker PubSubBroker, processConn ProcessConnection, port int, tlsConf *tls.Config) error {
 	udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
 	if err != nil {
 		return err
@@ -87,6 +91,6 @@ func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *t
 			continue
 		}
 
-		go process(conn, broker)
+		go processConn(conn, broker)
 	}
 }
