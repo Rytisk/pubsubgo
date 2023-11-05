@@ -77,6 +77,10 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 			fmt.Println("@ Publisher joined")
 			b.publishers.Add(publisher)
 
+			if b.subscribers.IsEmpty() {
+				publisher.Write([]byte(NoMoreSubscribers))
+			}
+
 		case publisher := <-b.publisherLeft:
 			fmt.Println("@ Publisher left")
 			b.publishers.Remove(publisher)

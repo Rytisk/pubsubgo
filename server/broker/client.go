@@ -29,10 +29,7 @@ func (c *Clients) Remove(client *Client) {
 
 func (c *Clients) Fanout(message []byte) {
 	for _, client := range c.entries {
-		select {
-		case client.messages <- message:
-		default: // drop messages in case receiver is disconnected or slow
-		}
+		client.Write(message)
 	}
 }
 
@@ -48,4 +45,11 @@ func NewClient() *Client {
 
 func (c *Client) ReadMessages() <-chan []byte {
 	return c.messages
+}
+
+func (c *Client) Write(message []byte) {
+	select {
+	case c.messages <- message:
+	default: // drop messages in case receiver is disconnected or slow
+	}
 }

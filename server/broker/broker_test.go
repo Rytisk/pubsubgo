@@ -51,8 +51,12 @@ func TestAddPublisher(t *testing.T) {
 	publishersMock := &ClientsMock{}
 	publishersMock.On("Add", publisher).Once()
 
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("IsEmpty").Return(false).Once()
+
 	broker := New()
 	broker.publishers = publishersMock
+	broker.subscribers = subscribersMock
 
 	stop := make(chan struct{})
 	go func() {
@@ -62,6 +66,35 @@ func TestAddPublisher(t *testing.T) {
 	broker.ProcessMessages(stop)
 
 	publishersMock.AssertExpectations(t)
+}
+
+func TestAddingPublisherInformsHimIfNoSubscribers(t *testing.T) {
+	publisher := NewClient()
+
+	publishersMock := &ClientsMock{}
+	publishersMock.On("Add", publisher).Once()
+
+	subscribersMock := &ClientsMock{}
+	subscribersMock.On("IsEmpty").Return(true).Once()
+
+	broker := New()
+	broker.publishers = publishersMock
+	broker.subscribers = subscribersMock
+
+	stop := make(chan struct{})
+	go func() {
+		broker.AddPublisher(publisher)
+		close(stop)
+	}()
+	broker.ProcessMessages(stop)
+
+	receivedMsg := <-publisher.ReadMessages()
+	if string(receivedMsg) != NoMoreSubscribers {
+		t.Errorf("publisher.ReadMessages() got '%s', want '%s'", receivedMsg, NoMoreSubscribers)
+	}
+
+	publishersMock.AssertExpectations(t)
+	subscribersMock.AssertExpectations(t)
 }
 
 func TestRemovePublisher(t *testing.T) {
