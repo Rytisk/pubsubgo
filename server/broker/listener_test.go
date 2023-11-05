@@ -33,6 +33,11 @@ func (cm *ConnectionMock) AcceptStream(ctx context.Context) (quic.Stream, error)
 	return args.Get(0).(quic.Stream), args.Error(1)
 }
 
+func (cm *ConnectionMock) CloseWithError(err quic.ApplicationErrorCode, msg string) error {
+	args := cm.Called(err, msg)
+	return args.Error(0)
+}
+
 func (sm *StreamMock) Write(b []byte) (int, error) {
 	args := sm.Called(b)
 	return args.Int(0), args.Error(1)
@@ -106,6 +111,7 @@ func TestProcessSubscriberConn(t *testing.T) {
 
 	mockConn := &ConnectionMock{}
 	mockConn.On("OpenUniStreamSync", mock.Anything).Return(mockStream, nil).Once()
+	mockConn.On("CloseWithError", ApplicationCodeNoError, mock.Anything).Return(nil).Once()
 
 	mockBroker := &BrokerMock{}
 	mockBroker.On("AddSubscriber", mock.Anything).Once()
@@ -125,6 +131,7 @@ func TestProcessPublisherConn(t *testing.T) {
 
 	mockConn := &ConnectionMock{}
 	mockConn.On("AcceptStream", mock.Anything).Return(mockStream, nil).Once()
+	mockConn.On("CloseWithError", ApplicationCodeNoError, mock.Anything).Return(nil).Once()
 
 	mockBroker := &BrokerMock{}
 	mockBroker.On("AddPublisher", mock.Anything).Once()

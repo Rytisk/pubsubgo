@@ -10,6 +10,8 @@ import (
 	"net"
 )
 
+const ApplicationCodeNoError quic.ApplicationErrorCode = 0x00
+
 type ProcessConnection func(conn quic.Connection, broker PubSubBroker)
 
 func forwardMessages(dst io.Writer, srcClient *Client) {
@@ -26,7 +28,12 @@ func forwardMessages(dst io.Writer, srcClient *Client) {
 func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 	subscriber := NewClient()
 	broker.AddSubscriber(subscriber)
-	defer broker.RemoveSubscriber(subscriber)
+	defer func() {
+		broker.RemoveSubscriber(subscriber)
+		if err := conn.CloseWithError(ApplicationCodeNoError, "Bye"); err != nil {
+			fmt.Printf("Failed to close a quic connection, reason: %s", err)
+		}
+	}()
 
 	stream, err := conn.OpenUniStreamSync(context.Background())
 	if err != nil {
@@ -40,7 +47,12 @@ func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 	publisher := NewClient()
 	broker.AddPublisher(publisher)
-	defer broker.RemovePublisher(publisher)
+	defer func() {
+		broker.RemovePublisher(publisher)
+		if err := conn.CloseWithError(ApplicationCodeNoError, "Bye"); err != nil {
+			fmt.Printf("Failed to close a quic connection, reason: %s", err)
+		}
+	}()
 
 	stream, err := conn.AcceptStream(context.Background())
 	if err != nil {
