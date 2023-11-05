@@ -12,6 +12,17 @@ import (
 
 type ProcessConnection func(conn quic.Connection, broker PubSubBroker)
 
+func forwardMessages(dst io.Writer, srcClient *Client) {
+	for msg := range srcClient.ReadMessages() {
+		if _, err := dst.Write(msg); err != nil {
+			if !errors.Is(err, io.EOF) {
+				fmt.Printf("error while forwarding: %s\n", err)
+			}
+			break
+		}
+	}
+}
+
 func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 	subscriber := NewClient()
 	broker.AddSubscriber(subscriber)
@@ -23,14 +34,7 @@ func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 		return
 	}
 
-	for msg := range subscriber.ReadMessages() {
-		if _, err := stream.Write(msg); err != nil {
-			if !errors.Is(err, io.EOF) {
-				fmt.Printf("error while writing to subscriber: %s\n", err)
-			}
-			break
-		}
-	}
+	forwardMessages(stream, subscriber)
 }
 
 func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
@@ -44,16 +48,7 @@ func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 		return
 	}
 
-	go func(publisher *Client, stream quic.Stream) {
-		for msg := range publisher.ReadMessages() {
-			if _, err := stream.Write(msg); err != nil {
-				if !errors.Is(err, io.EOF) {
-					fmt.Printf("error while writing to publisher: %s\n", err)
-				}
-				break
-			}
-		}
-	}(publisher, stream)
+	go forwardMessages(stream, publisher)
 
 	if _, err := io.Copy(broker, stream); err != nil {
 		if !errors.Is(err, io.EOF) {
@@ -67,9 +62,8 @@ func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *t
 	if err != nil {
 		return err
 	}
-	quicConf := &quic.Config{}
 
-	listener, err := quic.Listen(udpConn, tlsConf, quicConf)
+	listener, err := quic.Listen(udpConn, tlsConf, &quic.Config{})
 	if err != nil {
 		return err
 	}
@@ -80,7 +74,6 @@ func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *t
 			fmt.Printf("Failed to accept a new connection, reason: %s\n", err)
 			continue
 		}
-		fmt.Printf("New connection on port '%d': %s\n", port, conn.RemoteAddr().String())
 
 		go process(conn, broker)
 	}
