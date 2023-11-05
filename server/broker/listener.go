@@ -10,14 +10,14 @@ import (
 	"net"
 )
 
-type ProcessConnection func(conn *quic.Connection, brk *Broker)
+type ProcessConnection func(conn quic.Connection, broker PubSubBroker)
 
-func ProcessSubscriberConn(conn *quic.Connection, brk *Broker) {
+func ProcessSubscriberConn(conn quic.Connection, broker PubSubBroker) {
 	subscriber := NewClient()
-	brk.AddSubscriber(subscriber)
-	defer brk.RemoveSubscriber(subscriber)
+	broker.AddSubscriber(subscriber)
+	defer broker.RemoveSubscriber(subscriber)
 
-	stream, err := (*conn).OpenUniStreamSync(context.Background())
+	stream, err := conn.OpenUniStreamSync(context.Background())
 	if err != nil {
 		fmt.Printf("Failed to open a stream to subscriber, reason: %s\n", err)
 		return
@@ -33,36 +33,36 @@ func ProcessSubscriberConn(conn *quic.Connection, brk *Broker) {
 	}
 }
 
-func ProcessPublisherConn(conn *quic.Connection, brk *Broker) {
+func ProcessPublisherConn(conn quic.Connection, broker PubSubBroker) {
 	publisher := NewClient()
-	brk.AddPublisher(publisher)
-	defer brk.RemovePublisher(publisher)
+	broker.AddPublisher(publisher)
+	defer broker.RemovePublisher(publisher)
 
-	stream, err := (*conn).AcceptStream(context.Background())
+	stream, err := conn.AcceptStream(context.Background())
 	if err != nil {
 		fmt.Printf("Failed to accept publisher's stream, reason: %s\n", err)
 		return
 	}
 
-	go func(publisher *Client, stream *quic.Stream) {
+	go func(publisher *Client, stream quic.Stream) {
 		for msg := range publisher.ReadMessages() {
-			if _, err := (*stream).Write(msg); err != nil {
+			if _, err := stream.Write(msg); err != nil {
 				if !errors.Is(err, io.EOF) {
 					fmt.Printf("error while writing to publisher: %s\n", err)
 				}
 				break
 			}
 		}
-	}(publisher, &stream)
+	}(publisher, stream)
 
-	if _, err := io.Copy(brk, stream); err != nil {
+	if _, err := io.Copy(broker, stream); err != nil {
 		if !errors.Is(err, io.EOF) {
 			fmt.Printf("error while reading from publisher: %s\n", err)
 		}
 	}
 }
 
-func Listen(brk *Broker, process ProcessConnection, port int, tlsConf *tls.Config) error {
+func Listen(broker PubSubBroker, process ProcessConnection, port int, tlsConf *tls.Config) error {
 	udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
 	if err != nil {
 		return err
@@ -82,6 +82,6 @@ func Listen(brk *Broker, process ProcessConnection, port int, tlsConf *tls.Confi
 		}
 		fmt.Printf("New connection on port '%d': %s\n", port, conn.RemoteAddr().String())
 
-		go process(&conn, brk)
+		go process(conn, broker)
 	}
 }

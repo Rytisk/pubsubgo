@@ -5,6 +5,15 @@ import "fmt"
 const SubscriberJoined = "A new subscriber has joined!"
 const NoMoreSubscribers = "There are no subscribers listening!"
 
+type PubSubBroker interface {
+	AddSubscriber(subscriber *Client)
+	RemoveSubscriber(subscriber *Client)
+	AddPublisher(publisher *Client)
+	RemovePublisher(publisher *Client)
+	Write(message []byte) (int, error)
+	ProcessMessages(stop <-chan struct{})
+}
+
 type Broker struct {
 	subscribers      PubSubClients
 	publishers       PubSubClients

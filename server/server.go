@@ -25,7 +25,7 @@ func main() {
 
 func run(stop <-chan struct{}) {
 	tlsConf := generateTLSConfig()
-	brk := broker.New()
+	var brk broker.PubSubBroker = broker.New()
 
 	go func() {
 		if err := broker.Listen(brk, broker.ProcessPublisherConn, 8090, tlsConf); err != nil {
