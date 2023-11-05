@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"math/big"
 	"pubsubgo/server/broker"
 )
@@ -29,17 +30,19 @@ func run(stop <-chan struct{}) {
 
 	go func() {
 		if err := broker.Listen(brk, broker.ProcessPublisherConn, 8090, tlsConf); err != nil {
-			fmt.Printf("Failed to start listening for publisher connections, reason: %s\n", err)
+			log.Fatalf("Failed to start listening for publisher connections, reason: %s\n", err)
 		}
 	}()
 
 	go func() {
 		if err := broker.Listen(brk, broker.ProcessSubscriberConn, 8091, tlsConf); err != nil {
-			fmt.Printf("Failed to start listening for subscriber connections, reason: %s\n", err)
+			log.Fatalf("Failed to start listening for subscriber connections, reason: %s\n", err)
 		}
 	}()
 
 	brk.ProcessMessages(stop)
+
+	//TODO: graceful shutdown: close channels, close connections, wait for goroutines to finish
 }
 
 func generateTLSConfig() *tls.Config {

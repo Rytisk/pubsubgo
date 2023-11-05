@@ -1,6 +1,8 @@
 package broker
 
-import "fmt"
+import (
+	"log"
+)
 
 const SubscriberJoined = "A new subscriber has joined!"
 const NoMoreSubscribers = "There are no subscribers listening!"
@@ -65,16 +67,16 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
-			fmt.Println("@ Stopping processing")
+			log.Println("@ Stopping processing")
 			//TODO: close and drain channels?
 			return
 
 		case msg := <-b.messages:
-			fmt.Println("@ Message received")
+			log.Println("@ Message received")
 			b.subscribers.Fanout(msg)
 
 		case publisher := <-b.publisherJoined:
-			fmt.Println("@ Publisher joined")
+			log.Println("@ Publisher joined")
 			b.publishers.Add(publisher)
 
 			if b.subscribers.IsEmpty() {
@@ -82,17 +84,17 @@ func (b *Broker) ProcessMessages(stop <-chan struct{}) {
 			}
 
 		case publisher := <-b.publisherLeft:
-			fmt.Println("@ Publisher left")
+			log.Println("@ Publisher left")
 			b.publishers.Remove(publisher)
 			close(publisher.messages)
 
 		case subscriber := <-b.subscriberJoined:
-			fmt.Println("@ Subscriber joined")
+			log.Println("@ Subscriber joined")
 			b.subscribers.Add(subscriber)
 			b.publishers.Fanout([]byte(SubscriberJoined))
 
 		case subscriber := <-b.subscriberLeft:
-			fmt.Println("@ Subscriber left")
+			log.Println("@ Subscriber left")
 			b.subscribers.Remove(subscriber)
 			close(subscriber.messages)
 
