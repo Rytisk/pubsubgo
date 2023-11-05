@@ -28,8 +28,11 @@ func (c *Clients) Remove(client *Client) {
 }
 
 func (c *Clients) Fanout(message []byte) {
-	for _, subscriber := range c.entries {
-		subscriber.messages <- message // TODO: will block if one of the subs disconnected and buffer is full
+	for _, client := range c.entries {
+		select {
+		case client.messages <- message:
+		default: // drop messages in case receiver is disconnected or slow
+		}
 	}
 }
 
