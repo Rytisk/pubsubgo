@@ -27,8 +27,17 @@ func run(stop <-chan struct{}) {
 	tlsConf := generateTLSConfig()
 	brk := broker.New()
 
-	go broker.Listen(brk, broker.ProcessPublisherConn, 8090, tlsConf)
-	go broker.Listen(brk, broker.ProcessSubscriberConn, 8091, tlsConf)
+	go func() {
+		if err := broker.Listen(brk, broker.ProcessPublisherConn, 8090, tlsConf); err != nil {
+			fmt.Printf("Failed to start listening for publisher connections, reason: %s\n", err)
+		}
+	}()
+
+	go func() {
+		if err := broker.Listen(brk, broker.ProcessSubscriberConn, 8091, tlsConf); err != nil {
+			fmt.Printf("Failed to start listening for subscriber connections, reason: %s\n", err)
+		}
+	}()
 
 	brk.ProcessMessages(stop)
 }
