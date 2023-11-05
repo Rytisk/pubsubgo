@@ -1,69 +1,15 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/quic-go/quic-go"
-	"io"
 	"math/big"
-	"net"
 	"pubsubgo/server/broker"
 )
-
-type ProcessConnection func(conn *quic.Connection, brk *broker.Broker)
-
-func processSubscriberConnection(conn *quic.Connection, brk *broker.Broker) {
-	subscriber := broker.NewClient()
-	brk.AddSubscriber(subscriber)
-
-	stream, _ := (*conn).OpenUniStreamSync(context.Background())
-
-	for msg := range subscriber.ReadMessages() {
-		if _, err := stream.Write(msg); err != nil {
-			fmt.Printf("error while writing to subscriber: %s\n", err)
-			break
-		}
-	}
-
-	brk.RemoveSubscriber(subscriber)
-}
-
-func processPublisherConnection(conn *quic.Connection, brk *broker.Broker) {
-	publisher := broker.NewClient()
-	brk.AddPublisher(publisher)
-
-	stream, _ := (*conn).AcceptStream(context.Background())
-
-	go func(publisher *broker.Client, stream *quic.Stream) {
-		for msg := range publisher.ReadMessages() {
-			if _, err := (*stream).Write(msg); err != nil {
-				fmt.Printf("error while writing to publisher: %s\n", err)
-				break
-			}
-		}
-	}(publisher, &stream)
-
-	if _, err := io.Copy(brk, stream); err != nil {
-		fmt.Printf("error while reading from publisher: %s\n", err)
-	}
-
-	brk.RemovePublisher(publisher)
-}
-
-func run(stop <-chan struct{}) {
-	tlsConf := generateTLSConfig()
-	brk := broker.New()
-
-	go listen(brk, processPublisherConnection, 8090, tlsConf)
-	go listen(brk, processSubscriberConnection, 8091, tlsConf)
-
-	brk.ProcessMessages(stop)
-}
 
 func main() {
 	stop := make(chan struct{})
@@ -77,18 +23,14 @@ func main() {
 	run(stop)
 }
 
-func listen(brk *broker.Broker, process ProcessConnection, port int, tlsConf *tls.Config) {
-	udpConn, _ := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
-	quicConf := &quic.Config{}
+func run(stop <-chan struct{}) {
+	tlsConf := generateTLSConfig()
+	brk := broker.New()
 
-	listener, _ := quic.Listen(udpConn, tlsConf, quicConf)
+	go broker.Listen(brk, broker.ProcessPublisherConn, 8090, tlsConf)
+	go broker.Listen(brk, broker.ProcessSubscriberConn, 8091, tlsConf)
 
-	for {
-		conn, _ := listener.Accept(context.Background())
-		fmt.Printf("New connection on port '%d': %s\n", port, conn.RemoteAddr().String())
-
-		go process(&conn, brk)
-	}
+	brk.ProcessMessages(stop)
 }
 
 func generateTLSConfig() *tls.Config {
