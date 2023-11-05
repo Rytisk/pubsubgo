@@ -37,6 +37,7 @@ func publish() error {
 	}
 
 	conn, err := quic.DialAddr(context.Background(), "localhost:8090", tlsConf, quicConf)
+	defer conn.CloseWithError(0x00, "bye from publisher")
 	if err != nil {
 		return err
 	}
@@ -60,6 +61,10 @@ func publish() error {
 		message, err := readUserInput()
 		if err != nil {
 			return err
+		}
+
+		if string(message) == "exit()" {
+			return nil
 		}
 
 		_, err = stream.Write(message)
