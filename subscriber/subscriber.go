@@ -7,6 +7,7 @@ import (
 	"github.com/quic-go/quic-go"
 	"io"
 	"strings"
+	"time"
 )
 
 type loggingWriter struct{}
@@ -29,7 +30,9 @@ func subscribe() error {
 		NextProtos:         []string{"pub-sub-go"},
 	}
 
-	quicConf := &quic.Config{}
+	quicConf := &quic.Config{
+		KeepAlivePeriod: 2 * time.Second,
+	}
 
 	conn, err := quic.DialAddr(context.Background(), "localhost:8091", tlsConf, quicConf)
 	if err != nil {
